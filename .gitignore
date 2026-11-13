@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Cloudflare local secrets
+.dev.vars
+# Temporary package archives
+*.tgz
+
+# Uploaded documents
+/public/uploads/
