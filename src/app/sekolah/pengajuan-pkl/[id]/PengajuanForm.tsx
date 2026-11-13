@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -15,6 +16,7 @@ type StudentForm = {
 type Props = {
   lowonganId: number;
   kuota: number;
+  students: StudentForm[];
 };
 
 export default function PengajuanForm({
@@ -172,6 +174,7 @@ export default function PengajuanForm({
     }
 
     const nisnList = students.map((student) => student.nisn.trim());
+
     if (new Set(nisnList).size !== nisnList.length) {
       setError("Terdapat NISN siswa yang sama. Periksa kembali.");
       return;
@@ -196,7 +199,6 @@ export default function PengajuanForm({
 
     formData.append("lowonganId", String(lowonganId));
 
-    // Mengirim data siswa yang diisi secara manual.
     formData.append(
       "students",
       JSON.stringify(
@@ -279,7 +281,6 @@ export default function PengajuanForm({
           Isi data siswa yang akan diajukan ke instansi tujuan secara manual.
         </p>
 
-        {/* Statistik */}
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl bg-gradient-to-br from-[#07152f] to-blue-800 p-4 text-white">
             <p className="text-xs text-blue-200">Jumlah siswa</p>
@@ -296,7 +297,6 @@ export default function PengajuanForm({
           </div>
         </div>
 
-        {/* Form siswa manual */}
         <div className="mt-6 space-y-5">
           {students.map((student, index) => (
             <div
@@ -427,7 +427,6 @@ export default function PengajuanForm({
           ))}
         </div>
 
-        {/* Tambah siswa */}
         <button
           type="button"
           onClick={addStudent}

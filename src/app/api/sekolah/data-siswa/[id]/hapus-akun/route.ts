@@ -16,7 +16,8 @@ export async function DELETE(
   try {
     const user = await requireRole("school");
 
-    if (!user.schoolId) {
+    // Pastikan sesi sekolah tersedia dan valid.
+    if (!user || !user.schoolId) {
       return NextResponse.json(
         { message: "Akses sekolah tidak valid." },
         { status: 403 }
@@ -69,19 +70,26 @@ export async function DELETE(
 
     if (result.length === 0) {
       return NextResponse.json(
-        { message: "Akun siswa tidak ditemukan atau sudah tidak aktif." },
+        {
+          message:
+            "Akun siswa tidak ditemukan atau sudah tidak aktif.",
+        },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
-      message: "Akun siswa berhasil dinonaktifkan. Data dan riwayat PKL tetap tersimpan.",
+      message:
+        "Akun siswa berhasil dinonaktifkan. Data dan riwayat PKL tetap tersimpan.",
     });
   } catch (error) {
     console.error("HAPUS AKUN SISWA ERROR:", error);
 
     return NextResponse.json(
-      { message: "Terjadi kesalahan saat menonaktifkan akun siswa." },
+      {
+        message:
+          "Terjadi kesalahan saat menonaktifkan akun siswa.",
+      },
       { status: 500 }
     );
   }

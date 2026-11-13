@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Bisa menggunakan email atau username.
     const identifier = String(
       body.email || body.username || ""
     ).trim().toLowerCase();
@@ -89,11 +88,12 @@ export async function POST(request: NextRequest) {
         : null,
     });
 
-    const destination = {
-      admin: "/admin",
-      school: "/sekolah",
-      student: "/siswa",
-    }[role];
+    const destination =
+      role === "admin"
+        ? "/admin"
+        : role === "school"
+          ? "/sekolah"
+          : "/siswa";
 
     return NextResponse.json({
       message: "Login berhasil.",
