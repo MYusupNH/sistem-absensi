@@ -359,7 +359,7 @@ export default function Home() {
               </Link>
 
               <Link
-                href="/register-sekolah"
+               href="/daftar/sekolah"
                 className="rounded-full border border-white/70 px-6 py-3.5 text-sm font-semibold transition hover:bg-white/10 sm:px-7"
               >
                 Daftarkan Sekolah →

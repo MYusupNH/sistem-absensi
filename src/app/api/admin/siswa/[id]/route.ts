@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -8,6 +9,10 @@ export const dynamic = "force-dynamic";
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+// ========================================
+// EDIT DATA SISWA
+// ========================================
 
 export async function PATCH(
   request: NextRequest,
@@ -35,23 +40,27 @@ export async function PATCH(
 
     const body = await request.json();
 
-    const fullName = String(body.fullName ?? "").trim();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const nisn = String(body.nisn ?? "").trim();
-    const className = String(body.className ?? "").trim();
-    const major = String(body.major ?? "").trim();
-    const phone = String(body.phone ?? "").trim();
-    const password = String(body.password ?? "");
-    const isActive = body.isActive;
+    const {
+      fullName,
+      email,
+      nisn,
+      className,
+      major,
+      phone,
+      password,
+      isActive,
+    } = body;
 
-    if (!fullName || !email) {
+    if (!fullName?.trim() || !email?.trim()) {
       return NextResponse.json(
-        { message: "Nama dan email wajib diisi." },
+        { message: "Nama lengkap dan email wajib diisi." },
         { status: 400 }
       );
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
       return NextResponse.json(
         { message: "Format email tidak valid." },
         { status: 400 }
@@ -60,14 +69,14 @@ export async function PATCH(
 
     if (typeof isActive !== "boolean") {
       return NextResponse.json(
-        { message: "Status akun tidak valid." },
+        { message: "Status siswa tidak valid." },
         { status: 400 }
       );
     }
 
     if (password && password.length < 8) {
       return NextResponse.json(
-        { message: "Kata sandi baru minimal 8 karakter." },
+        { message: "Password minimal 8 karakter." },
         { status: 400 }
       );
     }
@@ -87,12 +96,11 @@ export async function PATCH(
       );
     }
 
-    // Periksa apakah email sudah digunakan akun lain.
     const duplicateEmail = await sql`
       SELECT id
       FROM users
-      WHERE LOWER(email) = ${email}
-        AND id <> ${studentId}
+      WHERE LOWER(email) = LOWER(${email.trim()})
+        AND id != ${studentId}
       LIMIT 1
     `;
 
@@ -103,15 +111,14 @@ export async function PATCH(
       );
     }
 
-    // Perbarui data akun siswa.
-    if (password.trim()) {
-      const passwordHash = await bcrypt.hash(password, 12);
+    if (password?.trim()) {
+      const passwordHash = await bcrypt.hash(password, 10);
 
       await sql`
         UPDATE users
         SET
-          full_name = ${fullName},
-          email = ${email},
+          full_name = ${fullName.trim()},
+          email = ${email.trim()},
           is_active = ${isActive},
           password_hash = ${passwordHash}
         WHERE id = ${studentId}
@@ -121,17 +128,16 @@ export async function PATCH(
       await sql`
         UPDATE users
         SET
-          full_name = ${fullName},
-          email = ${email},
+          full_name = ${fullName.trim()},
+          email = ${email.trim()},
           is_active = ${isActive}
         WHERE id = ${studentId}
           AND role = 'student'
       `;
     }
 
-    // Periksa apakah profil siswa sudah tersedia.
     const existingProfile = await sql`
-      SELECT id
+      SELECT user_id
       FROM student_profiles
       WHERE user_id = ${studentId}
       LIMIT 1
@@ -141,10 +147,10 @@ export async function PATCH(
       await sql`
         UPDATE student_profiles
         SET
-          nisn = ${nisn},
-          class_name = ${className},
-          major = ${major},
-          phone = ${phone}
+          nisn = ${nisn || null},
+          class_name = ${className || null},
+          major = ${major || null},
+          phone = ${phone || null}
         WHERE user_id = ${studentId}
       `;
     } else {
@@ -158,10 +164,10 @@ export async function PATCH(
         )
         VALUES (
           ${studentId},
-          ${nisn},
-          ${className},
-          ${major},
-          ${phone}
+          ${nisn || null},
+          ${className || null},
+          ${major || null},
+          ${phone || null}
         )
       `;
     }
@@ -170,20 +176,82 @@ export async function PATCH(
       success: true,
       message: "Data siswa berhasil diperbarui.",
     });
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("UPDATE STUDENT ERROR:", error);
 
-    const databaseError = error as { code?: string };
-
-    if (databaseError.code === "23505") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
       return NextResponse.json(
-        { message: "Email atau NISN sudah digunakan." },
+        { message: "Data email atau NISN sudah digunakan." },
         { status: 409 }
       );
     }
 
     return NextResponse.json(
       { message: "Terjadi kesalahan saat memperbarui data siswa." },
+      { status: 500 }
+    );
+  }
+}
+
+// ========================================
+// HAPUS PERMANEN DATA SISWA
+// ========================================
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteContext
+) {
+  try {
+    const admin = await requireRole("admin");
+
+    if (!admin) {
+      return NextResponse.json(
+        { message: "Akses ditolak. Silakan login sebagai Admin." },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const studentId = Number(id);
+
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      return NextResponse.json(
+        { message: "ID siswa tidak valid." },
+        { status: 400 }
+      );
+    }
+
+    const result = await sql`
+      DELETE FROM users
+      WHERE id = ${studentId}
+        AND role = 'student'
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { message: "Data siswa tidak ditemukan." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Data siswa berhasil dihapus secara permanen.",
+    });
+  } catch (error) {
+    console.error("DELETE STUDENT ERROR:", error);
+
+    return NextResponse.json(
+      {
+        message:
+          "Gagal menghapus data siswa. Kemungkinan masih terdapat data terkait di tabel lain.",
+      },
       { status: 500 }
     );
   }

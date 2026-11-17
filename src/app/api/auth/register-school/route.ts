@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
 
+    // Validasi data wajib
     if (
       !schoolName ||
       !npsn ||
@@ -33,6 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validasi NPSN
     if (!/^\d{8,10}$/.test(npsn)) {
       return NextResponse.json(
         { message: "NPSN harus terdiri dari 8 sampai 10 angka." },
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validasi email
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
         { message: "Format email tidak valid." },
@@ -47,6 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validasi password
     if (password.length < 8) {
       return NextResponse.json(
         { message: "Password minimal 8 karakter." },
@@ -84,15 +89,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Kode internal dibuat otomatis oleh sistem.
-    // Guru tidak perlu mengetahui atau memasukkannya.
+    // Kode internal sekolah dibuat otomatis
     const schoolCode =
       "SPK-" + randomBytes(4).toString("hex").toUpperCase();
 
-    // Membuat sekolah dan akun Guru dalam satu query.
-    // Jika salah satu proses gagal, keduanya tidak tersimpan sebagian.
+    // Simpan sekolah dan akun guru sekaligus
+    // Sekolah langsung berstatus ACTIVE
     await sql`
       WITH new_school AS (
         INSERT INTO schools (
@@ -109,7 +114,7 @@ export async function POST(request: NextRequest) {
           ${schoolCode},
           ${address || null},
           ${phone || null},
-          'PENDING'
+          'ACTIVE'
         )
         RETURNING id
       ),
@@ -137,7 +142,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message:
-          "Pendaftaran berhasil. Akun Guru dan sekolah Anda sedang menunggu verifikasi Admin.",
+          "Pendaftaran berhasil! Sekolah dan akun Guru Anda sudah aktif. Silakan login.",
       },
       { status: 201 }
     );

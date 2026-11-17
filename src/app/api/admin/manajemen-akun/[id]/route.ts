@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
+export const dynamic = "force-dynamic";
+
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
@@ -19,13 +21,17 @@ async function getAccountId(context: RouteContext) {
   return accountId;
 }
 
+// ========================================
 // EDIT AKUN / AKTIFKAN / NONAKTIFKAN
+// ========================================
+
 export async function PATCH(
   request: NextRequest,
   context: RouteContext
 ) {
   try {
     const admin = await requireRole("admin");
+
     if (!admin) {
       return NextResponse.json(
         { message: "Akses ditolak." },
@@ -34,6 +40,7 @@ export async function PATCH(
     }
 
     const id = await getAccountId(context);
+
     if (!id) {
       return NextResponse.json(
         { message: "ID akun tidak valid." },
@@ -120,13 +127,17 @@ export async function PATCH(
   }
 }
 
-// HAPUS PERMANEN
+// ========================================
+// HAPUS AKUN DAN RIWAYAT TERKAIT
+// ========================================
+
 export async function DELETE(
   _request: NextRequest,
   context: RouteContext
 ) {
   try {
     const admin = await requireRole("admin");
+
     if (!admin) {
       return NextResponse.json(
         { message: "Akses ditolak." },
@@ -135,6 +146,7 @@ export async function DELETE(
     }
 
     const id = await getAccountId(context);
+
     if (!id) {
       return NextResponse.json(
         { message: "ID akun tidak valid." },
@@ -142,7 +154,7 @@ export async function DELETE(
       );
     }
 
-    // Admin tidak boleh menghapus akunnya sendiri.
+    // Admin tidak boleh menghapus akun sendiri.
     if (Number((admin as { id?: number }).id) === id) {
       return NextResponse.json(
         { message: "Anda tidak dapat menghapus akun sendiri." },
@@ -150,8 +162,9 @@ export async function DELETE(
       );
     }
 
+    // Pastikan akun tersedia.
     const account = await sql`
-      SELECT id, role
+      SELECT id
       FROM users
       WHERE id = ${id}
       LIMIT 1
@@ -164,79 +177,54 @@ export async function DELETE(
       );
     }
 
-    // Lindungi akun yang masih memiliki riwayat PKL.
-    const [
-      attendance,
-      reports,
-      applications,
-      submittedApplications,
-    ] = await Promise.all([
+    // Hapus seluruh data dalam satu transaksi.
+    // Jika ada query gagal, seluruh transaksi dibatalkan.
+    const results = await sql.transaction([
+      // 1. Hapus detail pengajuan yang menggunakan
+      // akun sebagai siswa.
       sql`
-        SELECT id FROM absensi_pkl
+        DELETE FROM detail_pengajuan_pkl
         WHERE student_user_id = ${id}
-        LIMIT 1
       `,
+
+      // 2. Hapus pengajuan yang dibuat oleh akun.
+      // Detail terkait akan ikut terhapus melalui CASCADE.
       sql`
-        SELECT id FROM laporan_pkl
-        WHERE student_user_id = ${id}
-        LIMIT 1
-      `,
-      sql`
-        SELECT id FROM detail_pengajuan_pkl
-        WHERE student_user_id = ${id}
-        LIMIT 1
-      `,
-      sql`
-        SELECT id FROM pengajuan_pkl
+        DELETE FROM pengajuan_pkl
         WHERE diajukan_oleh = ${id}
-        LIMIT 1
+      `,
+
+      // 3. Hapus akun.
+      // Data yang memiliki relasi ON DELETE CASCADE
+      // akan ikut terhapus oleh database.
+      sql`
+        DELETE FROM users
+        WHERE id = ${id}
+        RETURNING id
       `,
     ]);
 
-    if (
-      attendance.length ||
-      reports.length ||
-      applications.length ||
-      submittedApplications.length
-    ) {
+    const deleted = results[2] as Array<{ id: number }>;
+
+    if (!deleted || deleted.length === 0) {
       return NextResponse.json(
-        {
-          message:
-            "Akun memiliki riwayat absensi, laporan, atau pengajuan PKL. Nonaktifkan akun saja agar riwayat tetap aman.",
-        },
-        { status: 409 }
-      );
-    }
-
-    // Hapus profil siswa jika ada, kemudian akun pengguna.
-    await sql`
-      DELETE FROM student_profiles
-      WHERE user_id = ${id}
-    `;
-
-    const deleted = await sql`
-      DELETE FROM users
-      WHERE id = ${id}
-      RETURNING id
-    `;
-
-    if (deleted.length === 0) {
-      return NextResponse.json(
-        { message: "Akun gagal dihapus atau sudah tidak tersedia." },
+        { message: "Akun tidak ditemukan atau sudah dihapus." },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
-      message: "Akun berhasil dihapus permanen.",
+      success: true,
+      message: "Akun dan riwayat terkait berhasil dihapus permanen.",
     });
   } catch (error) {
     console.error("DELETE MANAJEMEN AKUN:", error);
 
     return NextResponse.json(
       {
+        success: false,
         message:
-          "Akun belum dapat dihapus. Periksa apakah masih ada data lain yang terhubung.",
+          "Gagal menghapus akun dan riwayat terkait. Seluruh perubahan telah dibatalkan.",
       },
       { status: 500 }
     );

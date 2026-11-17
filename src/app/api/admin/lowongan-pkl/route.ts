@@ -5,7 +5,15 @@ import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-function parseCoordinate(value: unknown, min: number, max: number) {
+// ========================================
+// VALIDASI KOORDINAT GPS
+// ========================================
+
+function parseCoordinate(
+  value: unknown,
+  min: number,
+  max: number
+): number | null {
   if (value === null || value === undefined || value === "") {
     return null;
   }
@@ -19,42 +27,65 @@ function parseCoordinate(value: unknown, min: number, max: number) {
   return number;
 }
 
-function validateCoordinates(latitude: number | null, longitude: number | null) {
+function validateCoordinates(
+  latitude: number | null,
+  longitude: number | null
+) {
   if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
     return false;
   }
 
-  // Kedua koordinat harus diisi bersama-sama.
   return (latitude === null) === (longitude === null);
 }
 
-export async function GET() {
+// ========================================
+// GET - MENGAMBIL DATA LOWONGAN
+// ========================================
+
+export async function GET(request: NextRequest) {
   try {
     const user = await requireRole("admin");
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "Akses hanya untuk Admin." },
+        {
+          success: false,
+          message: "Akses hanya untuk Admin.",
+        },
         { status: 401 }
       );
     }
 
+    const arsip =
+      request.nextUrl.searchParams.get("arsip") === "true";
+
     const data = await sql`
       SELECT *
       FROM lowongan_pkl
+      WHERE is_archived = ${arsip}
       ORDER BY created_at DESC
     `;
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({
+      success: true,
+      data,
+    });
   } catch (error) {
     console.error("GET LOWONGAN ERROR:", error);
 
     return NextResponse.json(
-      { success: false, message: "Gagal mengambil data lowongan." },
+      {
+        success: false,
+        message: "Gagal mengambil data lowongan.",
+      },
       { status: 500 }
     );
   }
 }
+
+// ========================================
+// POST - TAMBAH LOWONGAN
+// ========================================
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,7 +93,10 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "Akses hanya untuk Admin." },
+        {
+          success: false,
+          message: "Akses hanya untuk Admin.",
+        },
         { status: 401 }
       );
     }
@@ -89,7 +123,10 @@ export async function POST(request: NextRequest) {
       !deskripsi?.trim()
     ) {
       return NextResponse.json(
-        { success: false, message: "Lengkapi semua kolom wajib." },
+        {
+          success: false,
+          message: "Lengkapi semua kolom wajib.",
+        },
         { status: 400 }
       );
     }
@@ -101,7 +138,10 @@ export async function POST(request: NextRequest) {
 
     if (!Number.isInteger(jumlahKuota) || jumlahKuota < 1) {
       return NextResponse.json(
-        { success: false, message: "Kuota minimal 1 siswa." },
+        {
+          success: false,
+          message: "Kuota minimal 1 siswa.",
+        },
         { status: 400 }
       );
     }
@@ -110,7 +150,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Latitude dan longitude harus diisi bersama dan dalam format yang valid.",
+          message:
+            "Latitude dan longitude harus diisi bersama dan dalam format yang valid.",
         },
         { status: 400 }
       );
@@ -118,7 +159,10 @@ export async function POST(request: NextRequest) {
 
     if (!Number.isInteger(radius) || radius < 20 || radius > 1000) {
       return NextResponse.json(
-        { success: false, message: "Radius absensi harus antara 20 sampai 1000 meter." },
+        {
+          success: false,
+          message: "Radius absensi harus antara 20 sampai 1000 meter.",
+        },
         { status: 400 }
       );
     }
@@ -151,7 +195,8 @@ export async function POST(request: NextRequest) {
         status,
         latitude,
         longitude,
-        radius_absensi
+        radius_absensi,
+        is_archived
       )
       VALUES (
         ${judul.trim()},
@@ -166,7 +211,8 @@ export async function POST(request: NextRequest) {
         ${status === "DITUTUP" ? "DITUTUP" : "DIBUKA"},
         ${latitude},
         ${longitude},
-        ${radius}
+        ${radius},
+        FALSE
       )
       RETURNING *
     `;
@@ -180,11 +226,18 @@ export async function POST(request: NextRequest) {
     console.error("POST LOWONGAN ERROR:", error);
 
     return NextResponse.json(
-      { success: false, message: "Gagal menyimpan lowongan." },
+      {
+        success: false,
+        message: "Gagal menyimpan lowongan.",
+      },
       { status: 500 }
     );
   }
 }
+
+// ========================================
+// PATCH - EDIT / PULIHKAN LOWONGAN
+// ========================================
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -192,15 +245,67 @@ export async function PATCH(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "Akses hanya untuk Admin." },
+        {
+          success: false,
+          message: "Akses hanya untuk Admin.",
+        },
         { status: 401 }
       );
     }
 
     const body = await request.json();
+    const lowonganId = Number(body.id);
+
+    if (!Number.isInteger(lowonganId) || lowonganId < 1) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "ID lowongan tidak valid.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ========================================
+    // PULIHKAN LOWONGAN DARI ARSIP
+    // ========================================
+
+    if (body.action === "RESTORE") {
+      const result = await sql`
+        UPDATE lowongan_pkl
+        SET
+          is_archived = FALSE,
+          status = 'DITUTUP',
+          updated_at = NOW()
+        WHERE id = ${lowonganId}
+          AND is_archived = TRUE
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Lowongan tidak ditemukan atau sudah aktif.",
+          },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message:
+          "Lowongan berhasil dipulihkan. Status pendaftaran tetap DITUTUP.",
+        data: result[0],
+      });
+    }
+
+    // ========================================
+    // EDIT LOWONGAN AKTIF
+    // ========================================
 
     const {
-      id,
       judul,
       nama_instansi,
       lokasi,
@@ -213,18 +318,10 @@ export async function PATCH(request: NextRequest) {
       status,
     } = body;
 
-    const lowonganId = Number(id);
     const jumlahKuota = Number(kuota);
     const latitude = parseCoordinate(body.latitude, -90, 90);
     const longitude = parseCoordinate(body.longitude, -180, 180);
     const radius = Number(body.radius_absensi ?? 100);
-
-    if (!Number.isInteger(lowonganId) || lowonganId < 1) {
-      return NextResponse.json(
-        { success: false, message: "ID lowongan tidak valid." },
-        { status: 400 }
-      );
-    }
 
     if (
       !judul?.trim() ||
@@ -235,7 +332,10 @@ export async function PATCH(request: NextRequest) {
       jumlahKuota < 1
     ) {
       return NextResponse.json(
-        { success: false, message: "Periksa kembali data lowongan." },
+        {
+          success: false,
+          message: "Periksa kembali data lowongan.",
+        },
         { status: 400 }
       );
     }
@@ -244,7 +344,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Latitude dan longitude harus diisi bersama dan dalam format yang valid.",
+          message:
+            "Latitude dan longitude harus diisi bersama dan dalam format yang valid.",
         },
         { status: 400 }
       );
@@ -252,7 +353,10 @@ export async function PATCH(request: NextRequest) {
 
     if (!Number.isInteger(radius) || radius < 20 || radius > 1000) {
       return NextResponse.json(
-        { success: false, message: "Radius absensi harus antara 20 sampai 1000 meter." },
+        {
+          success: false,
+          message: "Radius absensi harus antara 20 sampai 1000 meter.",
+        },
         { status: 400 }
       );
     }
@@ -289,12 +393,17 @@ export async function PATCH(request: NextRequest) {
         radius_absensi = ${radius},
         updated_at = NOW()
       WHERE id = ${lowonganId}
+        AND is_archived = FALSE
       RETURNING *
     `;
 
     if (result.length === 0) {
       return NextResponse.json(
-        { success: false, message: "Lowongan tidak ditemukan." },
+        {
+          success: false,
+          message:
+            "Lowongan tidak ditemukan atau sudah masuk arsip. Pulihkan terlebih dahulu untuk mengedit.",
+        },
         { status: 404 }
       );
     }
@@ -308,11 +417,18 @@ export async function PATCH(request: NextRequest) {
     console.error("PATCH LOWONGAN ERROR:", error);
 
     return NextResponse.json(
-      { success: false, message: "Gagal memperbarui lowongan." },
+      {
+        success: false,
+        message: "Gagal memperbarui lowongan.",
+      },
       { status: 500 }
     );
   }
 }
+
+// ========================================
+// DELETE - ARSIPKAN LOWONGAN
+// ========================================
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -320,42 +436,64 @@ export async function DELETE(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "Akses hanya untuk Admin." },
+        {
+          success: false,
+          message: "Akses hanya untuk Admin.",
+        },
         { status: 401 }
       );
     }
 
-    const id = Number(request.nextUrl.searchParams.get("id"));
+    const lowonganId = Number(
+      request.nextUrl.searchParams.get("id")
+    );
 
-    if (!Number.isInteger(id) || id < 1) {
+    if (!Number.isInteger(lowonganId) || lowonganId < 1) {
       return NextResponse.json(
-        { success: false, message: "ID lowongan tidak valid." },
+        {
+          success: false,
+          message: "ID lowongan tidak valid.",
+        },
         { status: 400 }
       );
     }
 
     const result = await sql`
-      DELETE FROM lowongan_pkl
-      WHERE id = ${id}
+      UPDATE lowongan_pkl
+      SET
+        is_archived = TRUE,
+        status = 'DITUTUP',
+        updated_at = NOW()
+      WHERE id = ${lowonganId}
+        AND is_archived = FALSE
       RETURNING id
     `;
 
     if (result.length === 0) {
       return NextResponse.json(
-        { success: false, message: "Lowongan tidak ditemukan." },
+        {
+          success: false,
+          message:
+            "Lowongan tidak ditemukan atau sudah diarsipkan.",
+        },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: "Lowongan berhasil dihapus.",
+      action: "ARCHIVED",
+      message:
+        "Lowongan berhasil diarsipkan. Riwayat pengajuan siswa tetap tersimpan.",
     });
   } catch (error) {
-    console.error("DELETE LOWONGAN ERROR:", error);
+    console.error("ARCHIVE LOWONGAN ERROR:", error);
 
     return NextResponse.json(
-      { success: false, message: "Gagal menghapus lowongan." },
+      {
+        success: false,
+        message: "Gagal mengarsipkan lowongan.",
+      },
       { status: 500 }
     );
   }

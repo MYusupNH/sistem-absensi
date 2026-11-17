@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -19,6 +20,7 @@ type Lowongan = {
   longitude: number | null;
   radius_absensi: number;
   created_at: string;
+  is_archived: boolean;
 };
 
 type FormData = {
@@ -68,11 +70,18 @@ export default function LowonganPKLPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("SEMUA");
+  const [view, setView] = useState<"AKTIF" | "ARSIP">("AKTIF");
+
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
+
   const [form, setForm] = useState<FormData>(initialForm);
+
+  // ========================================
+  // NOTIFIKASI
+  // ========================================
 
   const showMessage = (
     text: string,
@@ -82,23 +91,35 @@ export default function LowonganPKLPage() {
     setMessageType(type);
   };
 
+  // ========================================
+  // MENGAMBIL DATA LOWONGAN
+  // ========================================
+
   const loadData = useCallback(async () => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/admin/lowongan-pkl", {
+      const endpoint =
+        view === "ARSIP"
+          ? "/api/admin/lowongan-pkl?arsip=true"
+          : "/api/admin/lowongan-pkl";
+
+      const response = await fetch(endpoint, {
         cache: "no-store",
       });
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Gagal mengambil data lowongan.");
+        throw new Error(
+          result.message || "Gagal mengambil data lowongan."
+        );
       }
 
       setData(result.data || []);
     } catch (error) {
       console.error(error);
+
       showMessage(
         error instanceof Error
           ? error.message
@@ -108,11 +129,15 @@ export default function LowonganPKLPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // ========================================
+  // UPDATE FORM
+  // ========================================
 
   function updateForm(field: keyof FormData, value: string) {
     setForm((previous) => ({
@@ -121,11 +146,19 @@ export default function LowonganPKLPage() {
     }));
   }
 
+  // ========================================
+  // MODAL TAMBAH
+  // ========================================
+
   function openAddModal() {
     setEditingId(null);
     setForm(initialForm);
     setModalOpen(true);
   }
+
+  // ========================================
+  // MODAL EDIT
+  // ========================================
 
   function openEditModal(item: Lowongan) {
     setEditingId(item.id);
@@ -155,9 +188,16 @@ export default function LowonganPKLPage() {
     setModalOpen(true);
   }
 
+  // ========================================
+  // AMBIL LOKASI GPS ADMIN
+  // ========================================
+
   function ambilLokasiAdmin() {
     if (!navigator.geolocation) {
-      showMessage("Browser ini tidak mendukung fitur GPS.", "error");
+      showMessage(
+        "Browser ini tidak mendukung fitur GPS.",
+        "error"
+      );
       return;
     }
 
@@ -194,6 +234,10 @@ export default function LowonganPKLPage() {
       }
     );
   }
+
+  // ========================================
+  // SIMPAN TAMBAH / EDIT LOWONGAN
+  // ========================================
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -291,12 +335,17 @@ export default function LowonganPKLPage() {
       setModalOpen(false);
       setForm(initialForm);
       setEditingId(null);
-      showMessage(result.message || "Data lowongan berhasil disimpan.");
+
+      showMessage(
+        result.message || "Data lowongan berhasil disimpan."
+      );
 
       await loadData();
     } catch (error) {
       showMessage(
-        error instanceof Error ? error.message : "Terjadi kesalahan.",
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan.",
         "error"
       );
     } finally {
@@ -304,9 +353,13 @@ export default function LowonganPKLPage() {
     }
   }
 
+  // ========================================
+  // ARSIPKAN LOWONGAN
+  // ========================================
+
   async function deleteLowongan(id: number) {
     const yakin = window.confirm(
-      "Apakah Anda yakin ingin menghapus lowongan ini? Data yang dihapus tidak dapat dikembalikan."
+      "Arsipkan lowongan ini? Lowongan akan disembunyikan dari daftar aktif, tetapi data dan riwayat pengajuan siswa tetap tersimpan."
     );
 
     if (!yakin) return;
@@ -316,26 +369,89 @@ export default function LowonganPKLPage() {
     try {
       const response = await fetch(
         `/api/admin/lowongan-pkl?id=${id}`,
-        { method: "DELETE" }
+        {
+          method: "DELETE",
+        }
       );
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Gagal menghapus lowongan.");
+        throw new Error(
+          result.message || "Gagal mengarsipkan lowongan."
+        );
       }
 
-      showMessage(result.message || "Lowongan berhasil dihapus.");
+      showMessage(
+        result.message || "Lowongan berhasil diarsipkan."
+      );
+
       await loadData();
     } catch (error) {
       showMessage(
-        error instanceof Error ? error.message : "Gagal menghapus data.",
+        error instanceof Error
+          ? error.message
+          : "Gagal mengarsipkan lowongan.",
         "error"
       );
     } finally {
       setDeletingId(null);
     }
   }
+
+  // ========================================
+  // PULIHKAN LOWONGAN
+  // ========================================
+
+  async function restoreLowongan(id: number) {
+    const yakin = window.confirm(
+      "Pulihkan lowongan ini dari arsip? Lowongan akan kembali ke daftar aktif dengan status DITUTUP."
+    );
+
+    if (!yakin) return;
+
+    setDeletingId(id);
+
+    try {
+      const response = await fetch("/api/admin/lowongan-pkl", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          action: "RESTORE",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Gagal memulihkan lowongan."
+        );
+      }
+
+      showMessage(
+        result.message || "Lowongan berhasil dipulihkan."
+      );
+
+      await loadData();
+    } catch (error) {
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal memulihkan lowongan.",
+        "error"
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // ========================================
+  // FILTER DATA
+  // ========================================
 
   const filteredData = data.filter((item) => {
     const keyword = search.toLowerCase();
@@ -351,6 +467,10 @@ export default function LowonganPKLPage() {
     return cocokSearch && cocokStatus;
   });
 
+  // ========================================
+  // STATISTIK
+  // ========================================
+
   const totalDibuka = data.filter(
     (item) => item.status === "DIBUKA"
   ).length;
@@ -361,7 +481,10 @@ export default function LowonganPKLPage() {
 
   const totalKuota = data
     .filter((item) => item.status === "DIBUKA")
-    .reduce((total, item) => total + Number(item.kuota), 0);
+    .reduce(
+      (total, item) => total + Number(item.kuota),
+      0
+    );
 
   const totalLokasiSiap = data.filter(
     (item) =>
@@ -370,6 +493,10 @@ export default function LowonganPKLPage() {
       item.longitude !== null &&
       item.longitude !== undefined
   ).length;
+
+  // ========================================
+  // FORMAT TANGGAL
+  // ========================================
 
   function formatTanggal(value: string | null) {
     if (!value) return "-";
@@ -386,6 +513,10 @@ export default function LowonganPKLPage() {
     });
   }
 
+  // ========================================
+  // JUDUL BAGIAN FORM
+  // ========================================
+
   function SectionTitle({
     number,
     title,
@@ -398,15 +529,24 @@ export default function LowonganPKLPage() {
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-sm font-extrabold text-blue-700">
           {number}
         </div>
-        <h3 className="font-bold text-slate-800">{title}</h3>
+
+        <h3 className="font-bold text-slate-800">
+          {title}
+        </h3>
       </div>
     );
   }
 
+  // ========================================
+  // TAMPILAN HALAMAN
+  // ========================================
+
   return (
     <main className="min-h-screen bg-[#f4f7fc]">
       <section className="mx-auto max-w-7xl px-5 py-8 md:px-10">
-        {/* KOTAK HEADER (navy) */}
+
+        {/* HEADER */}
+
         <div className="relative mb-8 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0A1F44] via-[#0F2A5F] to-[#1A4A8C] p-6 text-white shadow-xl shadow-blue-900/20 md:p-8">
           <div
             aria-hidden="true"
@@ -425,34 +565,44 @@ export default function LowonganPKLPage() {
               </h1>
 
               <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100/80">
-                Kelola informasi kesempatan Praktik Kerja Lapangan, jumlah
-                peserta, periode pelaksanaan, dan lokasi absensi siswa.
+                Kelola informasi kesempatan Praktik Kerja Lapangan,
+                jumlah peserta, periode pelaksanaan, dan lokasi
+                absensi siswa.
               </p>
 
               <nav
                 aria-label="Breadcrumb"
                 className="mt-4 flex items-center gap-2 text-xs text-blue-100/70"
               >
-                <Link href="/admin" className="transition hover:text-white">
+                <Link
+                  href="/admin"
+                  className="transition hover:text-white"
+                >
                   Dashboard
                 </Link>
+
                 <span>/</span>
+
                 <span className="font-semibold text-cyan-300">
                   Lowongan PKL
                 </span>
               </nav>
             </div>
 
-            <button
-              type="button"
-              onClick={openAddModal}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-[#0A1F44] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-cyan-300"
-            >
-              <span className="text-lg leading-none">+</span>
-              Tambah Lowongan
-            </button>
+            {view === "AKTIF" && (
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-[#0A1F44] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-cyan-300"
+              >
+                <span className="text-lg leading-none">+</span>
+                Tambah Lowongan
+              </button>
+            )}
           </div>
         </div>
+
+        {/* NOTIFIKASI */}
 
         {message && (
           <div
@@ -463,6 +613,7 @@ export default function LowonganPKLPage() {
             }`}
           >
             <span>{message}</span>
+
             <button
               type="button"
               onClick={() => setMessage("")}
@@ -474,12 +625,17 @@ export default function LowonganPKLPage() {
           </div>
         )}
 
+        {/* STATISTIK */}
+
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {[
             {
-              title: "Total Lowongan",
+              title:
+                view === "AKTIF"
+                  ? "Total Lowongan Aktif"
+                  : "Total Lowongan Arsip",
               value: data.length,
-              icon: "📋",
+              icon: view === "AKTIF" ? "📋" : "🗄️",
               color: "bg-blue-50",
             },
             {
@@ -507,11 +663,15 @@ export default function LowonganPKLPage() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-500">{item.title}</p>
+                  <p className="text-sm text-slate-500">
+                    {item.title}
+                  </p>
+
                   <p className="mt-2 text-3xl font-extrabold text-slate-800">
                     {loading ? "..." : item.value}
                   </p>
                 </div>
+
                 <div
                   className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${item.color}`}
                 >
@@ -522,18 +682,67 @@ export default function LowonganPKLPage() {
           ))}
         </div>
 
+        {/* DAFTAR LOWONGAN */}
+
         <div className="mt-8 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+
+          {/* TAB AKTIF DAN ARSIP */}
+
+          <div className="flex flex-wrap gap-3 border-b border-slate-100 p-5">
+            <button
+              type="button"
+              onClick={() => {
+                setView("AKTIF");
+                setFilter("SEMUA");
+                setSearch("");
+                setMessage("");
+              }}
+              className={`rounded-xl px-5 py-3 text-sm font-bold transition ${
+                view === "AKTIF"
+                  ? "bg-blue-700 text-white shadow-md"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              📋 Lowongan Aktif
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setView("ARSIP");
+                setFilter("SEMUA");
+                setSearch("");
+                setMessage("");
+              }}
+              className={`rounded-xl px-5 py-3 text-sm font-bold transition ${
+                view === "ARSIP"
+                  ? "bg-amber-500 text-white shadow-md"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              🗄️ Arsip Lowongan
+            </button>
+          </div>
+
+          {/* JUDUL DAFTAR */}
+
           <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-6 md:flex-row md:items-center">
             <div>
               <h2 className="text-xl font-bold text-slate-800">
-                Daftar Lowongan PKL
+                {view === "AKTIF"
+                  ? "Daftar Lowongan Aktif"
+                  : "Arsip Lowongan PKL"}
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
-                Lihat, tambah, ubah, dan hapus informasi lowongan PKL.
+                {view === "AKTIF"
+                  ? "Kelola lowongan PKL yang masih tersimpan dalam daftar aktif."
+                  : "Lihat dan pulihkan lowongan PKL yang sudah diarsipkan."}
               </p>
             </div>
-
           </div>
+
+          {/* PENCARIAN DAN FILTER */}
 
           <div className="flex flex-col gap-3 border-b border-slate-100 p-5 md:flex-row">
             <input
@@ -554,6 +763,8 @@ export default function LowonganPKLPage() {
               <option value="DITUTUP">Ditutup</option>
             </select>
           </div>
+
+          {/* TABEL */}
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[950px] text-left text-sm">
@@ -586,7 +797,9 @@ export default function LowonganPKLPage() {
                       colSpan={8}
                       className="px-6 py-16 text-center text-slate-500"
                     >
-                      Tidak ada lowongan yang ditemukan.
+                      {view === "AKTIF"
+                        ? "Belum ada lowongan aktif yang ditemukan."
+                        : "Belum ada lowongan yang diarsipkan."}
                     </td>
                   </tr>
                 ) : (
@@ -606,6 +819,7 @@ export default function LowonganPKLPage() {
                           <p className="font-bold text-slate-800">
                             {item.judul}
                           </p>
+
                           <p className="mt-1 text-xs text-slate-400">
                             ID: #{item.id}
                           </p>
@@ -653,24 +867,43 @@ export default function LowonganPKLPage() {
                           </span>
                         </td>
 
+                        {/* AKSI */}
+
                         <td className="px-6 py-5">
                           <div className="flex justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(item)}
-                              className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
-                            >
-                              Edit
-                            </button>
+                            {view === "AKTIF" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditModal(item)}
+                                  className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                                >
+                                  Edit
+                                </button>
 
-                            <button
-                              type="button"
-                              onClick={() => deleteLowongan(item.id)}
-                              disabled={deletingId === item.id}
-                              className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 disabled:opacity-50"
-                            >
-                              {deletingId === item.id ? "Menghapus..." : "Hapus"}
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteLowongan(item.id)}
+                                  disabled={deletingId === item.id}
+                                  className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                  {deletingId === item.id
+                                    ? "Memproses..."
+                                    : "Arsipkan"}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => restoreLowongan(item.id)}
+                                disabled={deletingId === item.id}
+                                className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                              >
+                                {deletingId === item.id
+                                  ? "Memproses..."
+                                  : "Pulihkan"}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -681,23 +914,41 @@ export default function LowonganPKLPage() {
             </table>
           </div>
 
+          {/* FOOTER TABEL */}
+
           <div className="flex flex-col gap-1 border-t border-slate-100 px-6 py-4 text-xs text-slate-400 sm:flex-row sm:justify-between">
             <span>
-              Menampilkan {filteredData.length} dari {data.length} lowongan
+              Menampilkan {filteredData.length} dari {data.length}{" "}
+              {view === "AKTIF"
+                ? "lowongan aktif"
+                : "lowongan arsip"}
             </span>
-            <span>Total kuota lowongan aktif: {totalKuota} siswa</span>
+
+            {view === "AKTIF" && (
+              <span>
+                Total kuota lowongan aktif: {totalKuota} siswa
+              </span>
+            )}
           </div>
         </div>
       </section>
 
+      {/* ========================================
+          MODAL TAMBAH / EDIT LOWONGAN
+      ======================================== */}
+
       {modalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm">
           <div className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            {/* HEADER MODAL */}
+
             <div className="flex items-center justify-between bg-gradient-to-r from-[#0b2450] to-[#15549a] px-6 py-5 text-white">
               <div>
                 <p className="text-xs font-bold tracking-wider text-cyan-300">
                   FORMULIR ADMINISTRATOR
                 </p>
+
                 <h2 className="mt-1 text-xl font-bold">
                   {editingId
                     ? "Edit Informasi Lowongan PKL"
@@ -715,21 +966,32 @@ export default function LowonganPKLPage() {
               </button>
             </div>
 
+            {/* FORM */}
+
             <form
               onSubmit={handleSubmit}
               className="max-h-[78vh] space-y-8 overflow-y-auto p-5 md:p-7"
             >
+
+              {/* BAGIAN 1 */}
+
               <section className="space-y-5">
-                <SectionTitle number="01" title="Informasi Lowongan" />
+                <SectionTitle
+                  number="01"
+                  title="Informasi Lowongan"
+                />
 
                 <div>
                   <label className={labelClass}>
                     Nama Posisi / Bidang PKL *
                   </label>
+
                   <input
                     required
                     value={form.judul}
-                    onChange={(e) => updateForm("judul", e.target.value)}
+                    onChange={(e) =>
+                      updateForm("judul", e.target.value)
+                    }
                     placeholder="Contoh: Web Developer, Desain Grafis, Administrasi Perkantoran"
                     className={inputClass}
                   />
@@ -740,6 +1002,7 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Nama Perusahaan / Instansi *
                     </label>
+
                     <input
                       required
                       value={form.nama_instansi}
@@ -755,10 +1018,13 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Alamat Lengkap Lokasi PKL *
                     </label>
+
                     <input
                       required
                       value={form.lokasi}
-                      onChange={(e) => updateForm("lokasi", e.target.value)}
+                      onChange={(e) =>
+                        updateForm("lokasi", e.target.value)
+                      }
                       placeholder="Contoh: Jl. Raya Sukabumi No. 25, Kota Sukabumi"
                       className={inputClass}
                     />
@@ -769,11 +1035,14 @@ export default function LowonganPKLPage() {
                   <label className={labelClass}>
                     Deskripsi Kegiatan dan Tugas PKL *
                   </label>
+
                   <textarea
                     required
                     rows={4}
                     value={form.deskripsi}
-                    onChange={(e) => updateForm("deskripsi", e.target.value)}
+                    onChange={(e) =>
+                      updateForm("deskripsi", e.target.value)
+                    }
                     placeholder="Jelaskan kegiatan dan tanggung jawab siswa selama PKL."
                     className={inputClass}
                   />
@@ -783,6 +1052,7 @@ export default function LowonganPKLPage() {
                   <label className={labelClass}>
                     Persyaratan dan Kualifikasi Peserta
                   </label>
+
                   <textarea
                     rows={3}
                     value={form.persyaratan}
@@ -798,14 +1068,19 @@ export default function LowonganPKLPage() {
                   <label className={labelClass}>
                     Jurusan yang Dapat Mendaftar
                   </label>
+
                   <input
                     value={form.jurusan}
-                    onChange={(e) => updateForm("jurusan", e.target.value)}
+                    onChange={(e) =>
+                      updateForm("jurusan", e.target.value)
+                    }
                     placeholder="Contoh: RPL, TKJ, DKV, Akuntansi, atau Semua Jurusan"
                     className={inputClass}
                   />
                 </div>
               </section>
+
+              {/* BAGIAN 2 */}
 
               <section className="space-y-5">
                 <SectionTitle
@@ -818,13 +1093,16 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Jumlah Maksimal Peserta PKL *
                     </label>
+
                     <input
                       required
                       type="number"
                       min="1"
                       step="1"
                       value={form.kuota}
-                      onChange={(e) => updateForm("kuota", e.target.value)}
+                      onChange={(e) =>
+                        updateForm("kuota", e.target.value)
+                      }
                       placeholder="Contoh: 5"
                       className={inputClass}
                     />
@@ -834,6 +1112,7 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Status Pendaftaran *
                     </label>
+
                     <select
                       value={form.status}
                       onChange={(e) =>
@@ -847,6 +1126,7 @@ export default function LowonganPKLPage() {
                       <option value="DIBUKA">
                         Dibuka - Siswa dapat mendaftar
                       </option>
+
                       <option value="DITUTUP">
                         Ditutup - Pendaftaran tidak tersedia
                       </option>
@@ -859,6 +1139,7 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Tanggal Mulai Pelaksanaan PKL
                     </label>
+
                     <input
                       type="date"
                       value={form.tanggal_mulai}
@@ -873,6 +1154,7 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Tanggal Selesai Pelaksanaan PKL
                     </label>
+
                     <input
                       type="date"
                       value={form.tanggal_selesai}
@@ -886,6 +1168,8 @@ export default function LowonganPKLPage() {
                 </div>
               </section>
 
+              {/* BAGIAN 3 GPS */}
+
               <section className="space-y-5">
                 <SectionTitle
                   number="03"
@@ -897,6 +1181,7 @@ export default function LowonganPKLPage() {
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-xl">
                       📍
                     </div>
+
                     <div>
                       <h4 className="font-bold text-slate-800">
                         Tentukan Lokasi Instansi
@@ -908,12 +1193,23 @@ export default function LowonganPKLPage() {
                     <p className="text-sm font-bold text-slate-800">
                       Cara mengatur titik lokasi:
                     </p>
+
                     <ol className="mt-2 list-inside list-decimal space-y-1.5 text-xs leading-5 text-slate-600">
-                      <li>Datangi kantor atau lokasi pelaksanaan PKL.</li>
-                      <li>Aktifkan GPS atau layanan lokasi pada perangkat.</li>
-                      <li>Izinkan browser mengakses lokasi perangkat.</li>
-                      <li>Tekan tombol ambil koordinat GPS di bawah.</li>
-                      <li>Pastikan latitude dan longitude sudah terisi.</li>
+                      <li>
+                        Datangi kantor atau lokasi pelaksanaan PKL.
+                      </li>
+                      <li>
+                        Aktifkan GPS atau layanan lokasi pada perangkat.
+                      </li>
+                      <li>
+                        Izinkan browser mengakses lokasi perangkat.
+                      </li>
+                      <li>
+                        Tekan tombol ambil koordinat GPS di bawah.
+                      </li>
+                      <li>
+                        Pastikan latitude dan longitude sudah terisi.
+                      </li>
                     </ol>
                   </div>
 
@@ -941,6 +1237,7 @@ export default function LowonganPKLPage() {
                       <label className={labelClass}>
                         Latitude (Garis Lintang)
                       </label>
+
                       <input
                         type="number"
                         step="any"
@@ -959,6 +1256,7 @@ export default function LowonganPKLPage() {
                       <label className={labelClass}>
                         Longitude (Garis Bujur)
                       </label>
+
                       <input
                         type="number"
                         step="any"
@@ -978,6 +1276,7 @@ export default function LowonganPKLPage() {
                     <label className={labelClass}>
                       Radius Maksimal Absensi (Meter)
                     </label>
+
                     <input
                       required
                       type="number"
@@ -993,25 +1292,32 @@ export default function LowonganPKLPage() {
                     />
                   </div>
 
-                  {!form.latitude.trim() || !form.longitude.trim() ? (
+                  {!form.latitude.trim() ||
+                  !form.longitude.trim() ? (
                     <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-100 px-4 py-3 text-xs leading-5 text-amber-800">
                       <span>⚠️</span>
+
                       <span>
-                        <strong>Lokasi belum diatur.</strong> Isi kedua
-                        koordinat GPS agar lokasi absensi dapat digunakan.
+                        <strong>Lokasi belum diatur.</strong>{" "}
+                        Isi kedua koordinat GPS agar lokasi absensi
+                        dapat digunakan.
                       </span>
                     </div>
                   ) : (
                     <div className="mt-4 flex items-start gap-2 rounded-xl bg-emerald-100 px-4 py-3 text-xs leading-5 text-emerald-800">
                       <span>✓</span>
+
                       <span>
-                        <strong>Koordinat sudah diisi.</strong> Latitude:{" "}
-                        {form.latitude} dan Longitude: {form.longitude}.
+                        <strong>Koordinat sudah diisi.</strong>{" "}
+                        Latitude: {form.latitude} dan Longitude:{" "}
+                        {form.longitude}.
                       </span>
                     </div>
                   )}
                 </div>
               </section>
+
+              {/* TOMBOL FORM */}
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-slate-400">

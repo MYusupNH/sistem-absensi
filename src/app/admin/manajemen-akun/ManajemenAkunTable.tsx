@@ -110,7 +110,9 @@ export default function ManajemenAkunTable({
   }
 
   async function toggleStatus(account: Account) {
-    const action = account.is_active ? "menonaktifkan" : "mengaktifkan";
+    const action = account.is_active
+      ? "menonaktifkan"
+      : "mengaktifkan";
 
     if (!confirm(`Yakin ingin ${action} akun ${account.full_name}?`)) {
       return;
@@ -132,7 +134,7 @@ export default function ManajemenAkunTable({
 
   async function deleteAccount(account: Account) {
     const confirmation = confirm(
-      `HAPUS PERMANEN akun ${account.full_name}?\n\nTindakan ini tidak dapat dibatalkan. Jika akun memiliki riwayat PKL, penghapusan akan ditolak.`
+      `Yakin ingin menghapus akun ${account.full_name}?`
     );
 
     if (!confirmation) return;
@@ -151,7 +153,6 @@ export default function ManajemenAkunTable({
         throw new Error(data.message || "Gagal menghapus akun.");
       }
 
-      alert(data.message);
       router.refresh();
     } catch (error) {
       alert(

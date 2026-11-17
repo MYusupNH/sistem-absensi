@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
@@ -43,6 +44,7 @@ export default function StudentTable({
 
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -101,6 +103,58 @@ export default function StudentTable({
     setError("");
   }
 
+  // ========================================
+  // HAPUS / NONAKTIFKAN SISWA
+  // ========================================
+  async function handleDelete(student: Student) {
+    if (deletingId !== null) return;
+
+    if (!student.isActive) {
+      alert("Akun siswa ini sudah tidak aktif.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Apakah Anda yakin ingin menghapus akun siswa "${student.fullName}"?\n\nAkun siswa akan dinonaktifkan. Riwayat absensi dan PKL tetap tersimpan.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(student.id);
+
+    try {
+      const response = await fetch(
+        `/api/admin/siswa/${student.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || "Gagal menghapus data siswa."
+        );
+      }
+
+      alert(result.message || "Akun siswa berhasil dinonaktifkan.");
+
+      router.refresh();
+    } catch (err) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat menghapus data siswa."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // ========================================
+  // SIMPAN EDIT SISWA
+  // ========================================
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -125,7 +179,9 @@ export default function StudentTable({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || "Gagal memperbarui data siswa.");
+        throw new Error(
+          result.message || "Gagal memperbarui data siswa."
+        );
       }
 
       setMessage("Data siswa berhasil diperbarui.");
@@ -159,6 +215,7 @@ export default function StudentTable({
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+
         {/* HEADER */}
         <div className="border-b border-slate-100 p-5 md:p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -221,7 +278,7 @@ export default function StudentTable({
 
         {/* TABEL */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-left text-sm">
+          <table className="w-full min-w-[1050px] text-left text-sm">
             <thead className="bg-[#f7f9fd] text-xs uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-6 py-4">Siswa</th>
@@ -288,14 +345,34 @@ export default function StudentTable({
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(student)}
-                        className="rounded-lg bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white"
-                      >
-                        ✏️ Edit
-                      </button>
+                    {/* TOMBOL AKSI */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(student)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white"
+                        >
+                          ✏️ Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(student)}
+                          disabled={
+                            deletingId !== null || !student.isActive
+                          }
+                          className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {deletingId === student.id ? (
+                            "Memproses..."
+                          ) : student.isActive ? (
+                            <>🗑 Hapus</>
+                          ) : (
+                            "Nonaktif"
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -332,6 +409,7 @@ export default function StudentTable({
           }}
         >
           <div className="my-auto w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+
             {/* MODAL HEADER */}
             <div className="bg-gradient-to-r from-[#071a3d] to-[#1760a8] p-6 text-white">
               <div className="flex items-center justify-between">
@@ -363,6 +441,7 @@ export default function StudentTable({
 
             <form onSubmit={handleSubmit}>
               <div className="max-h-[65vh] space-y-5 overflow-y-auto p-6">
+
                 {/* PESAN */}
                 {message && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -383,6 +462,7 @@ export default function StudentTable({
                   </h3>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
                     <div className="md:col-span-2">
                       <label className="mb-2 block text-sm font-semibold text-slate-700">
                         Nama Lengkap
@@ -556,6 +636,7 @@ export default function StudentTable({
                     <strong>Tanggal daftar:</strong>{" "}
                     {formatDate(selectedStudent.createdAt)}
                   </p>
+
                   <p className="mt-2 text-xs text-blue-600">
                     Informasi sekolah dan tanggal pendaftaran ditampilkan
                     sebagai referensi dan tidak diubah melalui formulir ini.

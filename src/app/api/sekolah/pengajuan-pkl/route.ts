@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
   let uploadedFilePath = "";
 
   try {
+    // ========================================
+    // 1. VALIDASI LOGIN SEKOLAH
+    // ========================================
+
     const user = await requireRole("school");
 
     if (!user) {
@@ -46,15 +50,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ========================================
+    // 2. AMBIL DATA FORM
+    // ========================================
+
     const formData = await request.formData();
 
     const lowonganId = Number(formData.get("lowonganId"));
     const studentsRaw = String(formData.get("students") || "[]");
     const bulanMulai = String(formData.get("bulanMulai") || "");
     const bulanSelesai = String(formData.get("bulanSelesai") || "");
+
     const namaGuru = String(
       formData.get("namaGuruPembimbing") || ""
     ).trim();
+
     const pesan = String(formData.get("pesan") || "").trim();
     const surat = formData.get("suratPengajuan");
 
@@ -81,15 +91,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      !Number.isSafeInteger(lowonganId) ||
-      lowonganId <= 0
-    ) {
+    // ========================================
+    // 3. VALIDASI ID LOWONGAN
+    // ========================================
+
+    if (!Number.isSafeInteger(lowonganId) || lowonganId <= 0) {
       return NextResponse.json(
         { message: "Lowongan PKL tidak valid." },
         { status: 400 }
       );
     }
+
+    // ========================================
+    // 4. VALIDASI JUMLAH SISWA
+    // ========================================
 
     if (students.length === 0) {
       return NextResponse.json(
@@ -104,6 +119,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // ========================================
+    // 5. VALIDASI DATA SISWA
+    // ========================================
 
     for (let i = 0; i < students.length; i++) {
       const student = students[i];
@@ -142,7 +161,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (student.className.length > 50 || student.major.length > 100) {
+      if (
+        student.className.length > 50 ||
+        student.major.length > 100
+      ) {
         return NextResponse.json(
           { message: `Kelas atau jurusan siswa ke-${i + 1} terlalu panjang.` },
           { status: 400 }
@@ -159,12 +181,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ========================================
+    // 6. VALIDASI GURU PEMBIMBING
+    // ========================================
+
     if (!namaGuru || namaGuru.length > 150) {
       return NextResponse.json(
-        { message: "Nama guru pembimbing wajib diisi maksimal 150 karakter." },
+        {
+          message:
+            "Nama guru pembimbing wajib diisi maksimal 150 karakter.",
+        },
         { status: 400 }
       );
     }
+
+    // ========================================
+    // 7. VALIDASI PERIODE PKL
+    // ========================================
 
     if (
       !validMonth(bulanMulai) ||
@@ -184,6 +217,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ========================================
+    // 8. VALIDASI FILE SURAT
+    // ========================================
+
     if (
       !surat ||
       typeof surat === "string" ||
@@ -197,7 +234,10 @@ export async function POST(request: NextRequest) {
 
     if (surat.size <= 0 || surat.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { message: "Ukuran surat harus lebih dari 0 dan maksimal 5 MB." },
+        {
+          message:
+            "Ukuran surat harus lebih dari 0 dan maksimal 5 MB.",
+        },
         { status: 400 }
       );
     }
@@ -218,7 +258,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pastikan lowongan masih dibuka.
+    // ========================================
+    // 9. PERIKSA STATUS LOWONGAN
+    // ========================================
+
     const lowonganRows = await sql`
       SELECT id, kuota, status
       FROM lowongan_pkl
@@ -226,20 +269,29 @@ export async function POST(request: NextRequest) {
       LIMIT 1
     `;
 
-    if (
-      lowonganRows.length === 0 ||
-      lowonganRows[0].status !== "DIBUKA"
-    ) {
+    if (lowonganRows.length === 0) {
       return NextResponse.json(
-        { message: "Lowongan sudah tidak tersedia atau ditutup." },
+        { message: "Lowongan PKL tidak ditemukan." },
         { status: 404 }
+      );
+    }
+
+    if (lowonganRows[0].status !== "DIBUKA") {
+      return NextResponse.json(
+        {
+          message:
+            "Lowongan sudah ditutup. Pengajuan PKL tidak dapat dilakukan.",
+        },
+        { status: 409 }
       );
     }
 
     const kuota = Number(lowonganRows[0].kuota);
 
-    // Cegah siswa yang sama diajukan lagi ke lowongan
-    // yang sama ketika pengajuan sebelumnya masih aktif.
+    // ========================================
+    // 10. CEK DUPLIKASI SISWA MANUAL
+    // ========================================
+
     const duplicateManual = await sql`
       SELECT s.nisn
       FROM detail_pengajuan_siswa_manual d
@@ -261,7 +313,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Periksa juga data peserta dari sistem akun siswa lama.
+    // ========================================
+    // 11. CEK DUPLIKASI SISTEM AKUN SISWA LAMA
+    // ========================================
+
     const duplicateOld = await sql`
       SELECT sp.nisn
       FROM detail_pengajuan_pkl d
@@ -284,7 +339,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hitung kuota dari peserta sistem lama dan sistem manual.
+    // ========================================
+    // 12. PERIKSA KUOTA
+    // ========================================
+
     const quotaRows = await sql`
       SELECT
         (
@@ -316,7 +374,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Simpan file surat.
+    // ========================================
+    // 13. SIMPAN FILE SURAT
+    // ========================================
+
     const uploadDirectory = path.join(
       process.cwd(),
       "public",
@@ -336,10 +397,24 @@ export async function POST(request: NextRequest) {
     const tanggalMulai = `${bulanMulai}-01`;
     const tanggalSelesai = `${bulanSelesai}-01`;
 
-    // Satu pernyataan SQL untuk menyimpan pengajuan,
-    // data induk siswa, dan relasi peserta.
+    // ========================================
+    // 14. SIMPAN PENGAJUAN
+    // ========================================
+    // Lowongan diperiksa kembali menggunakan FOR UPDATE.
+    // Jika status sudah DITUTUP, proses penyimpanan dibatalkan.
+    // Penguncian ini juga mencegah perubahan status bersamaan
+    // selama proses penyimpanan pengajuan berlangsung.
+
     const result = await sql`
-      WITH input_students AS (
+      WITH locked_lowongan AS MATERIALIZED (
+        SELECT id
+        FROM lowongan_pkl
+        WHERE id = ${lowonganId}
+          AND status = 'DIBUKA'
+        FOR UPDATE
+      ),
+
+      input_students AS (
         SELECT *
         FROM jsonb_to_recordset(${JSON.stringify(students)}::jsonb)
         AS x(
@@ -350,6 +425,7 @@ export async function POST(request: NextRequest) {
           major text
         )
       ),
+
       saved_students AS (
         INSERT INTO school_students (
           school_id,
@@ -361,12 +437,14 @@ export async function POST(request: NextRequest) {
         )
         SELECT
           ${user.schoolId},
-          "fullName",
-          nisn,
-          email,
-          "className",
-          major
+          input_students."fullName",
+          input_students.nisn,
+          input_students.email,
+          input_students."className",
+          input_students.major
         FROM input_students
+        CROSS JOIN locked_lowongan
+
         ON CONFLICT (school_id, nisn)
         DO UPDATE SET
           full_name = EXCLUDED.full_name,
@@ -374,8 +452,10 @@ export async function POST(request: NextRequest) {
           class_name = EXCLUDED.class_name,
           major = EXCLUDED.major,
           updated_at = NOW()
+
         RETURNING id
       ),
+
       new_application AS (
         INSERT INTO pengajuan_pkl (
           lowongan_id,
@@ -389,8 +469,8 @@ export async function POST(request: NextRequest) {
           pesan,
           status
         )
-        VALUES (
-          ${lowonganId},
+        SELECT
+          locked_lowongan.id,
           ${user.schoolId},
           ${user.id},
           ${tanggalMulai},
@@ -400,9 +480,11 @@ export async function POST(request: NextRequest) {
           ${surat.name.slice(0, 255)},
           ${pesan || null},
           'MENUNGGU'
-        )
+        FROM locked_lowongan
+
         RETURNING id
       ),
+
       inserted_details AS (
         INSERT INTO detail_pengajuan_siswa_manual (
           pengajuan_id,
@@ -413,19 +495,58 @@ export async function POST(request: NextRequest) {
           saved_students.id
         FROM new_application
         CROSS JOIN saved_students
+
         RETURNING pengajuan_id
       )
+
       SELECT
         COUNT(*)::int AS total,
-        MAX(pengajuan_id) AS pengajuan_id
+        MAX(pengajuan_id) AS pengajuan_id,
+        (SELECT COUNT(*)::int FROM locked_lowongan)
+          AS lowongan_tersedia
       FROM inserted_details
     `;
 
-    if (!result[0] || Number(result[0].total) !== students.length) {
-      throw new Error("Data peserta pengajuan tidak berhasil disimpan.");
+    // ========================================
+    // 15. JIKA LOWONGAN SUDAH DITUTUP
+    // ========================================
+
+    if (Number(result[0]?.lowongan_tersedia || 0) === 0) {
+      try {
+        await unlink(uploadedFilePath);
+      } catch {
+        // Abaikan jika file tidak ditemukan.
+      }
+
+      uploadedFilePath = "";
+
+      return NextResponse.json(
+        {
+          message:
+            "Lowongan sudah ditutup. Pengajuan PKL tidak dapat dilakukan.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // ========================================
+    // 16. VALIDASI HASIL PENYIMPANAN
+    // ========================================
+
+    if (
+      !result[0] ||
+      Number(result[0].total) !== students.length
+    ) {
+      throw new Error(
+        "Data peserta pengajuan tidak berhasil disimpan."
+      );
     }
 
     uploadedFilePath = "";
+
+    // ========================================
+    // 17. BERHASIL
+    // ========================================
 
     return NextResponse.json(
       {
@@ -435,6 +556,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    // ========================================
+    // 18. HAPUS FILE JIKA PROSES GAGAL
+    // ========================================
+
     if (uploadedFilePath) {
       try {
         await unlink(uploadedFilePath);
@@ -446,7 +571,10 @@ export async function POST(request: NextRequest) {
     console.error("SIMPAN PENGAJUAN PKL ERROR:", error);
 
     return NextResponse.json(
-      { message: "Terjadi kesalahan saat menyimpan pengajuan PKL." },
+      {
+        message:
+          "Terjadi kesalahan saat menyimpan pengajuan PKL.",
+      },
       { status: 500 }
     );
   }

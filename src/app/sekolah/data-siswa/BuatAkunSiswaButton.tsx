@@ -193,66 +193,37 @@ export default function BuatAkunSiswaButton({
   if (credentials) {
     return (
       <div className="w-64 space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-        <div>
-          <p className="text-sm font-extrabold text-emerald-800">
-            ✓ Kredensial Berhasil Diperbarui
-          </p>
-          <p className="mt-1 text-xs text-emerald-700">
-            Simpan informasi login berikut untuk siswa.
-          </p>
-        </div>
+        <p className="text-sm font-semibold text-emerald-800">
+          Akun berhasil disimpan
+        </p>
 
-        <div className="space-y-3 rounded-lg border border-emerald-200 bg-white p-3">
+        <div className="space-y-2 text-xs text-slate-700">
           <div>
-            <p className="text-[10px] font-bold uppercase text-slate-400">
-              Email / Username
-            </p>
-            <p className="mt-1 break-all text-sm font-semibold text-slate-800">
-              {credentials.email}
-            </p>
+            <p className="font-medium">Email</p>
+            <p className="break-all text-black">{credentials.email}</p>
           </div>
 
-          <div className="border-t border-slate-100 pt-2">
-            <p className="text-[10px] font-bold uppercase text-slate-400">
-              Kata Sandi Baru
-            </p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="min-w-0 flex-1 break-all font-mono text-sm font-bold text-slate-800">
-                {showPassword ? credentials.password : "••••••••••"}
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="shrink-0 text-xs font-semibold text-blue-700"
-              >
-                {showPassword ? "Sembunyikan" : "Lihat"}
-              </button>
-            </div>
+          <div>
+            <p className="font-medium">Password</p>
+            <p className="break-all text-black">{credentials.password}</p>
           </div>
         </div>
 
         <button
           type="button"
           onClick={salinAkun}
-          className="w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-emerald-800"
+          className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
         >
-          {copied ? "✓ Berhasil Disalin" : "Salin Email & Password"}
+          {copied ? "Berhasil Disalin" : "Salin Email dan Password"}
         </button>
 
         <button
           type="button"
           onClick={() => setCredentials(null)}
-          className="w-full rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           Tutup
         </button>
-
-        {error && <p className="text-xs text-red-600">{error}</p>}
-
-        <p className="text-[10px] leading-relaxed text-emerald-800">
-          Password hanya ditampilkan sementara. Simpan sebelum menutup
-          tampilan ini.
-        </p>
       </div>
     );
   }
@@ -261,21 +232,28 @@ export default function BuatAkunSiswaButton({
   if (accountExists) {
     return (
       <div className="w-56 space-y-2">
-        <span className="inline-flex rounded-lg bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
-          ✓ Akun Aktif
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="text-xs font-semibold text-emerald-700">
+            Akun Aktif
+          </span>
+        </div>
+
+        {error && (
+          <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">
+            {error}
+          </p>
+        )}
 
         {!resetOpen ? (
           <>
             <button
               type="button"
               onClick={() => {
-                setError("");
-                setPassword("");
-                setConfirmPassword("");
                 setResetOpen(true);
+                setError("");
               }}
-              className="w-full rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800"
+              className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
             >
               Atur Ulang Password
             </button>
@@ -284,82 +262,82 @@ export default function BuatAkunSiswaButton({
               type="button"
               onClick={handleDeleteAccount}
               disabled={deleting}
-              className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
             >
-              {deleting ? "Menonaktifkan..." : "Hapus Akun"}
+              {deleting ? "Memproses..." : "Nonaktifkan Akun"}
             </button>
           </>
         ) : (
-          <form
-            onSubmit={handleResetPassword}
-            className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-          >
-            <h3 className="text-sm font-bold text-slate-800">
+          <form onSubmit={handleResetPassword} className="space-y-3">
+            <p className="text-xs font-semibold text-slate-700">
               Atur Ulang Password
-            </h3>
+            </p>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
                 Password Baru
               </label>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
                 maxLength={72}
                 required
                 placeholder="Minimal 8 karakter"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-blue-600"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-black outline-none focus:border-blue-600"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
                 Konfirmasi Password
               </label>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 minLength={8}
                 maxLength={72}
                 required
                 placeholder="Ulangi password"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs outline-none focus:border-blue-600"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-black outline-none focus:border-blue-600"
               />
             </div>
 
-            {error && (
-              <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">
-                {error}
-              </p>
-            )}
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={(e) => setShowPassword(e.target.checked)}
+              />
+              Tampilkan password
+            </label>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50"
-            >
-              {loading ? "Menyimpan..." : "Simpan Password Baru"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? "Menyimpan..." : "Simpan"}
+              </button>
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => {
-                setResetOpen(false);
-                setError("");
-              }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Batal
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetOpen(false);
+                  setPassword("");
+                  setConfirmPassword("");
+                  setError("");
+                  setShowPassword(false);
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+            </div>
           </form>
-        )}
-
-        {error && !resetOpen && (
-          <p className="text-xs text-red-600">{error}</p>
         )}
       </div>
     );
@@ -369,40 +347,30 @@ export default function BuatAkunSiswaButton({
   return (
     <div className="min-w-[190px]">
       {!open ? (
-        <div className="space-y-2">
-          <span className="inline-flex rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
-            Belum Ada Akun Aktif
-          </span>
-
-          <button
-            type="button"
-            onClick={() => {
-              setError("");
-              setOpen(true);
-            }}
-            className="w-full rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800"
-          >
-            + Buat / Aktifkan Akun
-          </button>
-
-          {error && <p className="text-xs text-red-600">{error}</p>}
-        </div>
-      ) : (
-        <form
-          onSubmit={handleSubmit}
-          className="w-72 space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(true);
+            setError("");
+          }}
+          className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
         >
-          <div>
-            <h3 className="font-bold text-slate-800">
-              Buat / Aktifkan Akun Siswa
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Masukkan email dan password login siswa.
+          + Buat Akun
+        </button>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <p className="text-xs font-semibold text-slate-700">
+            Buat Akun Siswa
+          </p>
+
+          {error && (
+            <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">
+              {error}
             </p>
-          </div>
+          )}
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-700">
+            <label className="mb-1 block text-xs font-medium text-slate-600">
               Email Login
             </label>
             <input
@@ -411,65 +379,71 @@ export default function BuatAkunSiswaButton({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Masukkan email siswa"
               required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-600"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-black outline-none focus:border-blue-600"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-700">
-              Kata Sandi
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Password
             </label>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimal 8 karakter"
               minLength={8}
               maxLength={72}
               required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-600"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-black outline-none focus:border-blue-600"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-700">
-              Konfirmasi Kata Sandi
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Konfirmasi Password
             </label>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Ulangi kata sandi"
               minLength={8}
               maxLength={72}
               required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-600"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-black outline-none focus:border-blue-600"
             />
           </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">
-              {error}
-            </p>
-          )}
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={showPassword}
+              onChange={(e) => setShowPassword(e.target.checked)}
+            />
+            Tampilkan password
+          </label>
 
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? "Menyimpan..." : "Simpan Akun"}
             </button>
 
             <button
               type="button"
-              disabled={loading}
               onClick={() => {
                 setOpen(false);
+                setEmail("");
+                setPassword("");
+                setConfirmPassword("");
                 setError("");
+                setShowPassword(false);
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
               Batal
             </button>

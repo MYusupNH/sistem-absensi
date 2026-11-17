@@ -164,9 +164,11 @@ export default function LaporanSiswaPage() {
           <p className="text-[10px] font-black tracking-[0.2em] text-blue-600">
             JURNAL HARIAN PKL
           </p>
+
           <h2 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
             Laporan Kegiatan PKL
           </h2>
+
           <p className="mt-2 text-sm leading-6 text-slate-500">
             Catat pekerjaan, hasil yang diperoleh, dan kendala yang kamu
             temui selama melaksanakan kegiatan PKL.
@@ -208,6 +210,7 @@ export default function LaporanSiswaPage() {
                 <h3 className="text-lg font-black text-slate-900">
                   Form Laporan Harian
                 </h3>
+
                 <p className="mt-1 text-xs text-slate-400">
                   Isi laporan kegiatan PKL kamu.
                 </p>
@@ -237,6 +240,7 @@ export default function LaporanSiswaPage() {
                 </div>
               )}
 
+              {/* KEGIATAN */}
               <div>
                 <label
                   htmlFor="kegiatan"
@@ -255,7 +259,12 @@ export default function LaporanSiswaPage() {
                   maxLength={5000}
                   rows={5}
                   placeholder="Tuliskan kegiatan yang kamu lakukan hari ini..."
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  style={{
+                    color: "#000000",
+                    WebkitTextFillColor: "#000000",
+                    opacity: 1,
+                  }}
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm !text-black outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 />
 
                 <p className="mt-2 text-right text-xs text-slate-400">
@@ -263,6 +272,7 @@ export default function LaporanSiswaPage() {
                 </p>
               </div>
 
+              {/* HASIL */}
               <div>
                 <label
                   htmlFor="hasil"
@@ -278,7 +288,12 @@ export default function LaporanSiswaPage() {
                   maxLength={3000}
                   rows={4}
                   placeholder="Tuliskan hasil atau pengetahuan yang diperoleh..."
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  style={{
+                    color: "#000000",
+                    WebkitTextFillColor: "#000000",
+                    opacity: 1,
+                  }}
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm !text-black outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 />
 
                 <p className="mt-2 text-right text-xs text-slate-400">
@@ -286,6 +301,7 @@ export default function LaporanSiswaPage() {
                 </p>
               </div>
 
+              {/* KENDALA */}
               <div>
                 <label
                   htmlFor="kendala"
@@ -301,7 +317,12 @@ export default function LaporanSiswaPage() {
                   maxLength={3000}
                   rows={4}
                   placeholder="Tuliskan kendala yang kamu alami, atau isi Tidak ada..."
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  style={{
+                    color: "#000000",
+                    WebkitTextFillColor: "#000000",
+                    opacity: 1,
+                  }}
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm !text-black outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 />
 
                 <p className="mt-2 text-right text-xs text-slate-400">
@@ -309,6 +330,7 @@ export default function LaporanSiswaPage() {
                 </p>
               </div>
 
+              {/* TOMBOL */}
               <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
                 <button
                   type="button"
@@ -342,11 +364,20 @@ export default function LaporanSiswaPage() {
           <h3 className="font-black text-blue-900">
             Panduan Pengisian Laporan
           </h3>
+
           <ul className="mt-3 space-y-2 text-sm leading-6 text-blue-800">
-            <li>• Isi kegiatan sesuai pekerjaan yang benar-benar dilakukan.</li>
-            <li>• Jelaskan hasil pekerjaan atau hal baru yang dipelajari.</li>
-            <li>• Tuliskan kendala jika ada, agar pembimbing dapat mengetahuinya.</li>
-            <li>• Gunakan bahasa yang jelas dan mudah dipahami.</li>
+            <li>
+              • Isi kegiatan sesuai pekerjaan yang benar-benar dilakukan.
+            </li>
+            <li>
+              • Jelaskan hasil pekerjaan atau hal baru yang dipelajari.
+            </li>
+            <li>
+              • Tuliskan kendala jika ada, agar pembimbing dapat mengetahuinya.
+            </li>
+            <li>
+              • Gunakan bahasa yang jelas dan mudah dipahami.
+            </li>
           </ul>
         </section>
 

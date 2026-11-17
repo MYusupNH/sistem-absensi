@@ -20,24 +20,29 @@ export default async function AdminPage() {
     attendanceResult,
     chartResult,
   ] = await Promise.all([
+    // TOTAL SEKOLAH (TIDAK MENGHITUNG INACTIVE)
     sql`
       SELECT COUNT(*) AS total
       FROM schools
+      WHERE status IS NULL
+         OR UPPER(TRIM(status)) <> 'INACTIVE'
     `,
 
+    // TOTAL SISWA
     sql`
       SELECT COUNT(*) AS total
       FROM users
       WHERE role = 'student'
     `,
 
+    // TOTAL ABSENSI
     sql`
       SELECT COUNT(*) AS total
       FROM absensi_pkl
       WHERE jam_masuk IS NOT NULL
     `,
 
-    // Grafik pendaftaran siswa selama 12 bulan terakhir
+    // GRAFIK PENDAFTARAN SISWA 12 BULAN TERAKHIR
     sql`
       SELECT
         EXTRACT(MONTH FROM months.month_start)::int AS month_number,
@@ -302,7 +307,6 @@ export default async function AdminPage() {
               aria-label="Grafik jumlah siswa PKL selama 12 bulan terakhir"
             >
               <defs>
-                {/* GRADASI AREA */}
                 <linearGradient
                   id="areaFill"
                   x1="0"
@@ -322,7 +326,6 @@ export default async function AdminPage() {
                   />
                 </linearGradient>
 
-                {/* GRADASI GARIS */}
                 <linearGradient
                   id="lineFill"
                   x1="0"
@@ -334,7 +337,6 @@ export default async function AdminPage() {
                   <stop offset="100%" stopColor="#67e8f9" />
                 </linearGradient>
 
-                {/* EFEK CAHAYA */}
                 <filter
                   id="lineGlow"
                   x="-50%"
@@ -414,7 +416,7 @@ export default async function AdminPage() {
               )}
 
               {/* TITIK DATA 12 BULAN */}
-              {points.map((point, index) => (
+              {points.map((point) => (
                 <g key={`${point.month}-${point.year}`}>
                   <circle
                     cx={point.x}
@@ -433,7 +435,6 @@ export default async function AdminPage() {
                     strokeWidth="2"
                   />
 
-                  {/* JUMLAH SISWA */}
                   <text
                     x={point.x}
                     y={Math.max(point.y - 20, 17)}
@@ -445,7 +446,6 @@ export default async function AdminPage() {
                     {point.total}
                   </text>
 
-                  {/* NAMA BULAN */}
                   <text
                     x={point.x}
                     y="290"
@@ -457,7 +457,6 @@ export default async function AdminPage() {
                     {point.month}
                   </text>
 
-                  {/* TAHUN */}
                   <text
                     x={point.x}
                     y="310"
